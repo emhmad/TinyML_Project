@@ -20,6 +20,9 @@ def _build_val_loader(config):
         train_ratio=float(dataset_cfg.get("train_split", 0.8)),
         seed=int(dataset_cfg.get("seed", 42)),
     )
+    max_val_samples = dataset_cfg.get("max_val_samples")
+    if max_val_samples is not None:
+        val_indices = val_indices[: int(max_val_samples)]
     val_dataset = HAM10000Dataset(
         metadata_csv=metadata_csv,
         transform=get_transforms(

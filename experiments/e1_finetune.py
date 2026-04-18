@@ -28,6 +28,12 @@ def _make_loaders(config: dict[str, Any]) -> tuple[DataLoader, DataLoader, torch
         train_ratio=float(dataset_cfg.get("train_split", 0.8)),
         seed=int(dataset_cfg.get("seed", 42)),
     )
+    max_train_samples = dataset_cfg.get("max_train_samples")
+    max_val_samples = dataset_cfg.get("max_val_samples")
+    if max_train_samples is not None:
+        train_indices = train_indices[: int(max_train_samples)]
+    if max_val_samples is not None:
+        val_indices = val_indices[: int(max_val_samples)]
     class_weights = compute_class_weights(metadata_csv, train_indices)
 
     train_dataset = HAM10000Dataset(

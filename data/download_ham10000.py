@@ -12,6 +12,7 @@ from utils.io import ensure_dir
 def discover_image_files(source_dir: str | Path) -> dict[str, Path]:
     source_dir = Path(source_dir)
     image_roots = [
+        source_dir,
         source_dir / "HAM10000_images",
         source_dir / "HAM10000_images_part_1",
         source_dir / "HAM10000_images_part_2",
@@ -29,10 +30,16 @@ def discover_image_files(source_dir: str | Path) -> dict[str, Path]:
 def build_processed_metadata(source_dir: str | Path, output_dir: str | Path) -> Path:
     source_dir = Path(source_dir)
     output_dir = ensure_dir(output_dir)
-    metadata_path = source_dir / "HAM10000_metadata.csv"
-    if not metadata_path.exists():
+    metadata_candidates = [
+        source_dir / "HAM10000_metadata.csv",
+        source_dir / "raw" / "HAM10000_metadata.csv",
+        source_dir / "HAM10000_metadata.tab",
+        source_dir / "raw" / "HAM10000_metadata.tab",
+    ]
+    metadata_path = next((path for path in metadata_candidates if path.exists()), None)
+    if metadata_path is None:
         raise FileNotFoundError(
-            f"Missing raw metadata at {metadata_path}. "
+            "Missing raw metadata in the expected HAM10000 source locations. "
             "Download and extract HAM10000 first, then rerun this script."
         )
 

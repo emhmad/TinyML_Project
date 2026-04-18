@@ -22,6 +22,9 @@ def _build_calibration_loader(config):
         train_ratio=float(dataset_cfg.get("train_split", 0.8)),
         seed=int(dataset_cfg.get("seed", 42)),
     )
+    max_train_samples = dataset_cfg.get("max_train_samples")
+    if max_train_samples is not None:
+        train_indices = train_indices[: int(max_train_samples)]
     calibration_size = int(config["pruning"].get("calibration_size", 128))
     train_dataset = HAM10000Dataset(
         metadata_csv=metadata_csv,
