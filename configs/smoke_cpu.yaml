@@ -6,8 +6,8 @@ dataset:
   seed: 42
   num_workers: 0
   metadata_csv: ./data/ham10000/processed_metadata.csv
-  max_train_samples: 256
-  max_val_samples: 128
+  max_train_samples: 128
+  max_val_samples: 32
 
 models:
   teacher: deit_small_patch16_224
@@ -40,9 +40,9 @@ augmentation:
     std: [0.229, 0.224, 0.225]
 
 pruning:
-  criteria: [magnitude, wanda, taylor, random]
-  sparsities: [0.2, 0.4, 0.5, 0.6, 0.7]
-  calibration_size: 32
+  criteria: [magnitude, wanda]
+  sparsities: [0.5]
+  calibration_size: 16
   exclude_layers:
     - head
     - cls_token
@@ -75,6 +75,10 @@ evaluation:
   batch_size: 16
   latency_warmup_runs: 3
   latency_timed_runs: 10
+
+smoke:
+  e5_criteria: [magnitude]
+  e5_groups: [mlp]
 
 logging:
   results_dir: ./results/logs_smoke/

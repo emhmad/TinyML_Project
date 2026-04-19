@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import os
 from pathlib import Path
-from tempfile import NamedTemporaryFile
+from tempfile import mkstemp
 from typing import Any
 
 import pandas as pd
@@ -50,6 +51,10 @@ def save_masks(path: str | Path, masks: dict[str, torch.Tensor]) -> None:
 
 
 def get_serialized_model_size_kb(model: torch.nn.Module) -> float:
-    with NamedTemporaryFile(suffix=".pt") as handle:
-        torch.save(model.state_dict(), handle.name)
-        return Path(handle.name).stat().st_size / 1024.0
+    fd, temp_path = mkstemp(suffix=".pt")
+    os.close(fd)
+    try:
+        torch.save(model.state_dict(), temp_path)
+        return Path(temp_path).stat().st_size / 1024.0
+    finally:
+        Path(temp_path).unlink(missing_ok=True)

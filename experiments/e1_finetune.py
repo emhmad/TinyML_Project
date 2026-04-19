@@ -14,13 +14,14 @@ from tqdm import tqdm
 from data.dataset import HAM10000Dataset, compute_class_weights, get_train_val_splits, get_transforms
 from evaluation.metrics import evaluate_model
 from models.load_models import load_deit_model
-from utils.config import get_device, load_config
+from utils.config import get_device, load_config, should_pin_memory
 from utils.io import append_csv_row, ensure_dir, save_checkpoint
 
 
 def _make_loaders(config: dict[str, Any]) -> tuple[DataLoader, DataLoader, torch.Tensor]:
     dataset_cfg = config["dataset"]
     finetune_cfg = config["finetune"]
+    pin_memory = should_pin_memory()
     metadata_csv = dataset_cfg.get("metadata_csv") or str(Path(dataset_cfg["root"]) / "processed_metadata.csv")
 
     train_indices, val_indices = get_train_val_splits(
@@ -62,14 +63,14 @@ def _make_loaders(config: dict[str, Any]) -> tuple[DataLoader, DataLoader, torch
         batch_size=int(finetune_cfg.get("batch_size", 64)),
         shuffle=True,
         num_workers=int(dataset_cfg.get("num_workers", 4)),
-        pin_memory=True,
+        pin_memory=pin_memory,
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=int(config["evaluation"].get("batch_size", 128)),
         shuffle=False,
         num_workers=int(dataset_cfg.get("num_workers", 4)),
-        pin_memory=True,
+        pin_memory=pin_memory,
     )
     return train_loader, val_loader, class_weights
 

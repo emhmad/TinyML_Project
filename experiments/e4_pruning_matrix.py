@@ -5,6 +5,7 @@ from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader, Subset
+from tqdm import tqdm
 
 from data.dataset import HAM10000Dataset, get_train_val_splits, get_transforms
 from evaluation.metrics import CLASS_NAMES, evaluate_model
@@ -12,12 +13,13 @@ from evaluation.model_size import get_model_size_kb
 from models.load_models import get_linear_layer_names, load_deit_model
 from pruning.masking import apply_masks, compute_global_masks, get_sparsity_stats
 from pruning.scoring import magnitude_score, random_score, taylor_score, wanda_score
-from utils.config import get_device, load_config
+from utils.config import get_device, load_config, should_pin_memory
 from utils.io import append_csv_row, ensure_dir, load_checkpoint_state, save_masks
 
 
 def _build_loaders(config):
     dataset_cfg = config["dataset"]
+    pin_memory = should_pin_memory()
     metadata_csv = dataset_cfg.get("metadata_csv") or str(Path(dataset_cfg["root"]) / "processed_metadata.csv")
     train_indices, val_indices = get_train_val_splits(
         metadata_csv,
@@ -59,14 +61,14 @@ def _build_loaders(config):
         batch_size=min(32, calibration_size),
         shuffle=False,
         num_workers=int(dataset_cfg.get("num_workers", 4)),
-        pin_memory=True,
+        pin_memory=pin_memory,
     )
     val_loader = DataLoader(
         val_dataset,
         batch_size=int(config["evaluation"].get("batch_size", 128)),
         shuffle=False,
         num_workers=int(dataset_cfg.get("num_workers", 4)),
-        pin_memory=True,
+        pin_memory=pin_memory,
     )
     return calibration_loader, val_loader
 
@@ -113,7 +115,13 @@ def run(config_path: str, model_names: list[str] | None = None) -> None:
 
         activation_norms = torch.load(calibration_dir / f"{alias}_activation_norms.pt", map_location="cpu")
         gradients = torch.load(calibration_dir / f"{alias}_gradients.pt", map_location="cpu")
-        baseline_results = evaluate_model(base_model, val_loader, device, class_names=CLASS_NAMES)
+        baseline_results = evaluate_model(
+            base_model,
+            val_loader,
+            device,
+            class_names=CLASS_NAMES,
+            progress_desc=f"{alias} dense eval",
+        )
         append_csv_row(
             log_path,
             {
@@ -134,9 +142,9 @@ def run(config_path: str, model_names: list[str] | None = None) -> None:
             },
         )
 
-        for criterion_name in config["pruning"]["criteria"]:
+        for criterion_name in tqdm(config["pruning"]["criteria"], desc=f"{alias} criteria", leave=False):
             scores = _score_layers(target_layers, criterion_name, activation_norms=activation_norms, gradients=gradients)
-            for sparsity in config["pruning"]["sparsities"]:
+            for sparsity in tqdm(config["pruning"]["sparsities"], desc=f"{alias} {criterion_name}", leave=False):
                 model = load_deit_model(
                     model_name=model_name,
                     num_classes=int(config["models"].get("num_classes", 7)),
@@ -147,7 +155,13 @@ def run(config_path: str, model_names: list[str] | None = None) -> None:
                 apply_masks(model, masks)
 
                 stats = get_sparsity_stats(model, masks)
-                metrics = evaluate_model(model, val_loader, device, class_names=CLASS_NAMES)
+                metrics = evaluate_model(
+                    model,
+                    val_loader,
+                    device,
+                    class_names=CLASS_NAMES,
+                    progress_desc=f"{alias} {criterion_name} s={sparsity}",
+                )
                 size_info = get_model_size_kb(model, sparse=True)
 
                 append_csv_row(

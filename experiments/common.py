@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader, Subset
 from data.dataset import HAM10000Dataset, compute_class_weights, get_train_val_splits, get_transforms
 from models.load_models import get_linear_layer_names, load_deit_model
 from pruning.hooks import ActivationCollector
+from utils.config import should_pin_memory
 from utils.io import load_checkpoint_state
 
 
@@ -38,6 +39,7 @@ def build_dataloaders(
 ) -> tuple[DataLoader | None, DataLoader, DataLoader | None, torch.Tensor]:
     dataset_cfg = config["dataset"]
     augmentation_cfg = config["augmentation"]
+    pin_memory = should_pin_memory()
     metadata_csv = metadata_csv_path(config)
     train_indices, val_indices = build_splits(config)
 
@@ -80,7 +82,7 @@ def build_dataloaders(
             batch_size=int(config["finetune"].get("batch_size", 64)),
             shuffle=True,
             num_workers=num_workers,
-            pin_memory=True,
+            pin_memory=pin_memory,
         )
 
     val_loader = DataLoader(
@@ -88,7 +90,7 @@ def build_dataloaders(
         batch_size=int(config["evaluation"].get("batch_size", 128)),
         shuffle=False,
         num_workers=num_workers,
-        pin_memory=True,
+        pin_memory=pin_memory,
     )
 
     calibration_loader = None
@@ -99,7 +101,7 @@ def build_dataloaders(
             batch_size=min(32, calibration_size),
             shuffle=False,
             num_workers=num_workers,
-            pin_memory=True,
+            pin_memory=pin_memory,
         )
 
     class_weights = compute_class_weights(metadata_csv, train_indices)

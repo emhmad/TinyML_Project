@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 import torch
+from tqdm import tqdm
 
 from evaluation.metrics import CLASS_NAMES, evaluate_model
 from experiments.common import build_dataloaders, load_trained_model, model_alias
@@ -24,11 +25,20 @@ def run(config_path: str) -> None:
     model_name = config["models"]["teacher"]
     alias = model_alias(model_name)
     base_model = load_trained_model(config, model_name, device, checkpoint_name=f"{alias}_ham10000")
-    baseline = evaluate_model(base_model, val_loader, device, class_names=CLASS_NAMES)
+    baseline = evaluate_model(
+        base_model,
+        val_loader,
+        device,
+        class_names=CLASS_NAMES,
+        progress_desc=f"{alias} per-layer baseline",
+    )
     activation_norms = torch.load(calibration_dir / f"{alias}_activation_norms.pt", map_location="cpu")
     layer_groups = get_layer_groups(base_model)
 
-    for criterion_name in ("wanda", "magnitude"):
+    criteria = config.get("smoke", {}).get("e5_criteria", ["wanda", "magnitude"])
+    groups = config.get("smoke", {}).get("e5_groups", ["qkv", "attn_out", "mlp", "patch_embed"])
+
+    for criterion_name in tqdm(criteria, desc=f"{alias} per-layer criteria", leave=False):
         scores: dict[str, torch.Tensor] = {}
         for layer_name, layer in base_model.named_modules():
             if not isinstance(layer, torch.nn.Linear):
@@ -41,10 +51,16 @@ def run(config_path: str) -> None:
             else:
                 scores[layer_name] = magnitude_score(weight)
 
-        for group_name in ("qkv", "attn_out", "mlp", "patch_embed"):
+        for group_name in tqdm(groups, desc=f"{alias} {criterion_name} groups", leave=False):
             model = load_trained_model(config, model_name, device, checkpoint_name=f"{alias}_ham10000")
             masks = prune_only_group(model, scores, sparsity=0.5, group_name=group_name, layer_groups=layer_groups)
-            metrics = evaluate_model(model, val_loader, device, class_names=CLASS_NAMES)
+            metrics = evaluate_model(
+                model,
+                val_loader,
+                device,
+                class_names=CLASS_NAMES,
+                progress_desc=f"{alias} {criterion_name} {group_name}",
+            )
 
             append_csv_row(
                 log_path,

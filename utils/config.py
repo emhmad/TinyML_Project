@@ -27,3 +27,9 @@ def get_device(prefer_cuda: bool = True) -> torch.device:
     if prefer_cuda and torch.cuda.is_available():
         return torch.device("cuda")
     return torch.device("cpu")
+
+
+def should_pin_memory(device: torch.device | None = None) -> bool:
+    if device is None:
+        return torch.cuda.is_available()
+    return device.type == "cuda"

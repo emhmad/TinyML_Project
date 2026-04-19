@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, classification_report, confusion_matrix
+from tqdm import tqdm
 
 CLASS_NAMES = ["akiec", "bcc", "bkl", "df", "mel", "nv", "vasc"]
 DANGEROUS_CLASSES = ["mel", "bcc", "akiec"]
@@ -16,14 +17,17 @@ def _compute_specificity(conf_mat: np.ndarray, class_index: int) -> float:
     return float(tn / max(1, tn + fp))
 
 
-def evaluate_model(model, data_loader, device, class_names=None):
+def evaluate_model(model, data_loader, device, class_names=None, progress_desc: str | None = None):
     class_names = class_names or CLASS_NAMES
     model.eval()
     predictions: list[int] = []
     targets: list[int] = []
+    iterator = data_loader
+    if progress_desc:
+        iterator = tqdm(data_loader, desc=progress_desc, leave=False)
 
     with torch.no_grad():
-        for images, labels in data_loader:
+        for images, labels in iterator:
             images = images.to(device, non_blocking=True)
             logits = model(images)
             preds = torch.argmax(logits, dim=1).detach().cpu().numpy()

@@ -8,12 +8,13 @@ from torch.utils.data import DataLoader
 from data.dataset import HAM10000Dataset, get_train_val_splits, get_transforms
 from evaluation.metrics import CLASS_NAMES, evaluate_model
 from models.load_models import load_deit_model
-from utils.config import get_device, load_config
+from utils.config import get_device, load_config, should_pin_memory
 from utils.io import append_csv_row, load_checkpoint_state
 
 
 def _build_val_loader(config):
     dataset_cfg = config["dataset"]
+    pin_memory = should_pin_memory()
     metadata_csv = dataset_cfg.get("metadata_csv") or str(Path(dataset_cfg["root"]) / "processed_metadata.csv")
     _, val_indices = get_train_val_splits(
         metadata_csv,
@@ -38,7 +39,7 @@ def _build_val_loader(config):
         batch_size=int(config["evaluation"].get("batch_size", 128)),
         shuffle=False,
         num_workers=int(dataset_cfg.get("num_workers", 4)),
-        pin_memory=True,
+        pin_memory=pin_memory,
     )
 
 

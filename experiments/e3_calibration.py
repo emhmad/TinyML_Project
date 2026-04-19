@@ -10,12 +10,13 @@ from torch.utils.data import DataLoader, Subset
 from data.dataset import HAM10000Dataset, compute_class_weights, get_train_val_splits, get_transforms
 from models.load_models import get_linear_layer_names, load_deit_model
 from pruning.hooks import ActivationCollector, GradientCollector
-from utils.config import get_device, load_config
+from utils.config import get_device, load_config, should_pin_memory
 from utils.io import ensure_dir, load_checkpoint_state
 
 
 def _build_calibration_loader(config):
     dataset_cfg = config["dataset"]
+    pin_memory = should_pin_memory()
     metadata_csv = dataset_cfg.get("metadata_csv") or str(Path(dataset_cfg["root"]) / "processed_metadata.csv")
     train_indices, _ = get_train_val_splits(
         metadata_csv,
@@ -42,7 +43,7 @@ def _build_calibration_loader(config):
         batch_size=min(32, calibration_size),
         shuffle=False,
         num_workers=int(dataset_cfg.get("num_workers", 4)),
-        pin_memory=True,
+        pin_memory=pin_memory,
     )
     class_weights = compute_class_weights(metadata_csv, train_indices)
     return loader, class_weights
